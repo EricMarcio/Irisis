@@ -6,8 +6,12 @@
 <title>Sala de tela</title>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
-:root{--bg:#10151f;--card:#18202e;--line:#2a3547;--tx:#e8edf5;--mut:#8b98ad;--ac:#ffb454;--ok:#5fd3a0;--bad:#ff7a7a}
-@media(prefers-color-scheme:light){:root{--bg:#eef1f6;--card:#fff;--line:#d3dae6;--tx:#161d2b;--mut:#5b687d;--ac:#c26a00;--ok:#13805a;--bad:#c23030}}
+:root{color-scheme:dark;--bg:#10151f;--card:#18202e;--line:#2a3547;--tx:#e8edf5;--mut:#8b98ad;--ac:#ffb454;--ok:#5fd3a0;--bad:#ff7a7a}
+:root[data-theme="light"]{color-scheme:light;--bg:#eef1f6;--card:#fff;--line:#d3dae6;--tx:#161d2b;--mut:#5b687d;--ac:#c26a00;--ok:#13805a;--bad:#c23030}
+:root[data-theme="mid"]{color-scheme:dark;--bg:#566178;--card:#647089;--line:#8592ab;--tx:#f4f7fb;--mut:#e0e6f0;--ac:#ffd08a;--ok:#9af2cc;--bad:#ffb4b4}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+.top h1{margin:0}
+.vol{width:68px;accent-color:var(--ac);cursor:pointer}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 "Trebuchet MS",Verdana,sans-serif}
 main{max-width:1280px;margin:0 auto;padding:22px 16px 60px}
@@ -32,7 +36,7 @@ input[type=text]{font:inherit;width:100%;background:var(--bg);color:var(--tx);bo
 .tile.focus{grid-column:1/-1}
 .tile video{width:100%;height:100%;object-fit:contain;display:block}
 .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#9aa6ba;text-align:center;padding:10px;pointer-events:none}
-.bar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;align-items:center;padding:6px 8px;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.bar{position:absolute;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px;background:linear-gradient(transparent,rgba(0,0,0,.75))}
 .bar .nm{flex:1;color:#fff;font-weight:700;font-size:.9rem;text-shadow:0 1px 2px #000}
 .hint{border:1px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--mut);margin-bottom:12px}
 .hide{display:none!important}
@@ -48,10 +52,15 @@ li.v .n{flex:1;overflow-wrap:anywhere}
 #log div{margin-bottom:4px;overflow-wrap:anywhere}#log b{color:var(--ac)}#log i{color:var(--mut)}
 .link{display:flex;gap:8px}.link input{font:13px monospace}
 </style>
+<script>
+(function(){var t=null;try{t=localStorage.getItem('tema')}catch(e){}
+if(t!=='light'&&t!=='mid'&&t!=='dark')t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';
+document.documentElement.setAttribute('data-theme',t)})();
+</script>
 </head>
 <body>
 <main>
-<h1>Sala de tela</h1>
+<header class="top"><h1>Sala de tela</h1><button id="bTheme" onclick="cycleTheme()" title="Alternar tema"></button></header>
 
 <section id="home">
   <p>Todos na sala podem transmitir a tela ou uma janela, e cada um escolhe quais transmissões assistir. Sem conta e sem servidor seu.</p>
@@ -105,6 +114,14 @@ const h=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=nul
 const PRE='sala-';
 let peer,myId='',me='',isHost=false,hostConn=null,stream=null;
 const peers=new Map(),conns=new Map(),out=new Map(),watching=new Set(),inCalls=new Map(),tiles=new Map();
+const vols=new Map();
+const THEMES=['light','mid','dark'],TNAME={light:'Claro',mid:'Meio-termo',dark:'Escuro'};
+function setThemeLabel(){$('bTheme').textContent='Tema: '+TNAME[document.documentElement.getAttribute('data-theme')]}
+function cycleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme'),nx=THEMES[(THEMES.indexOf(cur)+1)%3];
+  document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('tema',nx)}catch(e){}setThemeLabel();
+}
+setThemeLabel();
 const rnd=()=>Math.random().toString(36).slice(2,8);
 const clean=s=>(s||'').trim().replace(/^.*#/,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
 function setStatus(t,c){const s=$('status');s.textContent=t;s.className='st '+(c||'')}
@@ -207,6 +224,13 @@ function addTile(id,label,local){
   const t=h('div','tile'),v=h('video'),ph=h('div','ph',local?'':'Conectando…'),bar=h('div','bar');
   v.autoplay=true;v.playsInline=true;if(local)v.muted=true;
   bar.appendChild(h('span','nm',label));
+  if(!local){
+    const r=h('input','vol');r.type='range';r.min=0;r.max=100;r.step=1;
+    const vol=vols.has(id)?vols.get(id):1;r.value=Math.round(vol*100);v.volume=vol;
+    r.title='Volume de '+label;r.setAttribute('aria-label','Volume de '+label);
+    r.oninput=()=>{v.volume=r.value/100;vols.set(id,v.volume)};
+    bar.appendChild(r);
+  }
   const mk=(txt,fn)=>{const b=h('button','sm',txt);b.onclick=()=>fn(b);bar.appendChild(b)};
   mk(v.muted?'Ativar som':'Silenciar',b=>{v.muted=!v.muted;b.textContent=v.muted?'Ativar som':'Silenciar'});
   mk('Destacar',b=>{t.classList.toggle('focus');b.textContent=t.classList.contains('focus')?'Reduzir':'Destacar'});
