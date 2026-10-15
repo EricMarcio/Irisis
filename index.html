@@ -12,6 +12,8 @@
 .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
 .top h1{margin:0}
 .vol{width:68px;accent-color:var(--ac);cursor:pointer}
+:root{--cl:70%}:root[data-theme="light"]{--cl:34%}:root[data-theme="mid"]{--cl:88%}
+li.v .n.c{color:hsl(var(--h) 78% var(--cl));font-weight:700}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 "Trebuchet MS",Verdana,sans-serif}
 main{max-width:1280px;margin:0 auto;padding:22px 16px 60px}
@@ -49,7 +51,7 @@ li.v{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px sol
 li.v .n{flex:1;overflow-wrap:anywhere}
 .live{font-size:.72rem;font-weight:700;background:var(--bad);color:#fff;border-radius:4px;padding:1px 6px}
 #log{height:180px;overflow-y:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;font-size:.9rem}
-#log div{margin-bottom:4px;overflow-wrap:anywhere}#log b{color:var(--ac)}#log i{color:var(--mut)}
+#log div{margin-bottom:4px;overflow-wrap:anywhere}#log b{color:hsl(var(--h,40) 78% var(--cl))}#log i{color:var(--mut)}
 .link{display:flex;gap:8px}.link input{font:13px monospace}
 </style>
 <script>
@@ -60,16 +62,19 @@ document.documentElement.setAttribute('data-theme',t)})();
 </head>
 <body>
 <main>
-<header class="top"><h1>Sala de tela</h1><button id="bTheme" onclick="cycleTheme()" title="Alternar tema"></button></header>
+<header class="top"><h1>Sala de tela</h1><div class="row"><button id="bLeave" class="hide" onclick="leave()">Sair da sala</button><button id="bTheme" onclick="cycleTheme()" title="Alternar tema"></button></div></header>
 
 <section id="home">
-  <p>Todos na sala podem transmitir a tela ou uma janela, e cada um escolhe quais transmissões assistir. Sem conta e sem servidor seu.</p>
+  <p id="intro">Todos na sala podem transmitir a tela ou uma janela, e cada um escolhe quais transmissões assistir. Sem conta e sem servidor seu.</p>
   <div class="card" style="max-width:460px">
     <h2>Seu nome</h2>
-    <input type="text" id="name" maxlength="20" placeholder="Como os amigos vão te ver">
-    <div class="row" style="margin-top:12px"><button class="pri" onclick="startHost()">Criar sala</button></div>
-    <p style="margin-top:14px">Recebeu um link ou código?</p>
-    <div class="row"><input type="text" id="code" placeholder="Link ou código da sala" style="flex:1;width:auto"><button onclick="goJoin()">Entrar</button></div>
+    <input type="text" id="name" maxlength="20" placeholder="Como os amigos vão te ver" onkeydown="if(event.key==='Enter'&&pendingCode)joinFromLink()">
+    <div class="row hide" id="linkRow" style="margin-top:12px"><button class="pri" onclick="joinFromLink()">Entrar na sala</button></div>
+    <div class="row" id="createRow" style="margin-top:12px"><button class="pri" onclick="startHost()">Criar sala</button></div>
+    <div id="codeBlock">
+      <p style="margin-top:14px">Recebeu um link ou código?</p>
+      <div class="row"><input type="text" id="code" placeholder="Link ou código da sala" style="flex:1;width:auto"><button onclick="goJoin()">Entrar</button></div>
+    </div>
   </div>
 </section>
 
@@ -114,7 +119,7 @@ const h=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=nul
 const PRE='sala-';
 let peer,myId='',me='',isHost=false,hostConn=null,stream=null;
 const peers=new Map(),conns=new Map(),out=new Map(),watching=new Set(),inCalls=new Map(),tiles=new Map();
-const vols=new Map();
+const vols=new Map(),seen=new Map();
 const THEMES=['light','mid','dark'],TNAME={light:'Claro',mid:'Meio-termo',dark:'Escuro'};
 function setThemeLabel(){$('bTheme').textContent='Tema: '+TNAME[document.documentElement.getAttribute('data-theme')]}
 function cycleTheme(){
@@ -125,8 +130,8 @@ setThemeLabel();
 const rnd=()=>Math.random().toString(36).slice(2,8);
 const clean=s=>(s||'').trim().replace(/^.*#/,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
 function setStatus(t,c){const s=$('status');s.textContent=t;s.className='st '+(c||'')}
-function show(r){$('home').classList.toggle('hide',r);$('room').classList.toggle('hide',!r)}
-function logMsg(who,text,sys){const d=h('div');if(sys)d.appendChild(h('i',null,text));else{d.appendChild(h('b',null,who+': '));d.appendChild(document.createTextNode(text))}$('log').appendChild(d);$('log').scrollTop=1e9}
+function show(r){$('home').classList.toggle('hide',r);$('room').classList.toggle('hide',!r);$('bLeave').classList.toggle('hide',!r)}
+function logMsg(who,text,sys,hue){const d=h('div');if(sys)d.appendChild(h('i',null,text));else{const b=h('b',null,who+': ');if(hue!=null)b.style.setProperty('--h',hue);d.appendChild(b);d.appendChild(document.createTextNode(text))}$('log').appendChild(d);$('log').scrollTop=1e9}
 function getName(){me=($('name').value||'').trim()||'Visitante '+rnd().slice(0,3);try{localStorage.setItem('nome',me)}catch(e){}}
 function copyLink(b){const t=$('link');t.select();(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).catch(()=>document.execCommand('copy'));const o=b.textContent;b.textContent='Copiado';setTimeout(()=>b.textContent=o,1400)}
 
@@ -134,24 +139,28 @@ function copyLink(b){const t=$('link');t.select();(navigator.clipboard?navigator
 function send(m){if(isHost)route(myId,m);else if(hostConn&&hostConn.open)hostConn.send(m)}
 function bc(o){conns.forEach(c=>c.open&&c.send(o));onMsg(o)}
 function deliver(to,o){if(to===myId)onMsg(o);else{const c=conns.get(to);if(c&&c.open)c.send(o)}}
-function pushRoster(){bc({t:'roster',list:[...peers].map(([id,p])=>({id,name:p.name,live:p.live}))})}
+function pushRoster(){bc({t:'roster',list:[...peers].map(([id,p])=>({id,name:p.name,live:p.live,hue:p.hue}))})}
 function route(from,m){
+  seen.set(from,Date.now());
   const p=peers.get(from);
-  if(m.t==='hello'){peers.set(from,{name:m.n,live:false});bc({t:'sys',m:m.n+' entrou'});pushRoster()}
+  if(m.t==='ping')return;
+  if(m.t==='bye'){removePeer(from);return}
+  if(m.t==='hello'){const n=String(m.n||'Visitante').slice(0,20);peers.set(from,{name:n,live:false,hue:pickHue()});bc({t:'sys',m:n+' entrou'});pushRoster()}
   else if(!p)return;
-  else if(m.t==='chat')bc({t:'chat',n:p.name,m:m.m});
+  else if(m.t==='chat')bc({t:'chat',n:p.name,m:String(m.m).slice(0,500),h:p.hue});
   else if(m.t==='live'){p.live=m.on;pushRoster()}
   else if(m.t==='watch')deliver(m.target,{t:'watchReq',from});
   else if(m.t==='unwatch')deliver(m.target,{t:'unwatch',from});
 }
 function onMsg(m){
   if(m.t==='roster'){
-    if(!isHost){peers.clear();m.list.forEach(x=>peers.set(x.id,{name:x.name,live:x.live}))}
+    if(!isHost){peers.clear();m.list.forEach(x=>peers.set(x.id,{name:x.name,live:x.live,hue:x.hue}))}
     [...watching].forEach(id=>{if(!(peers.get(id)||{}).live)stopWatching(id,false)});
     renderPeople();
   }
-  else if(m.t==='chat')logMsg(m.n,m.m);
+  else if(m.t==='chat')logMsg(m.n,m.m,false,m.h);
   else if(m.t==='sys')logMsg('',m.m,true);
+  else if(m.t==='hostbye'&&!isHost)setStatus('O anfitrião saiu. Transmissões em andamento continuam, mas a lista e o chat pararam.','bad');
   else if(m.t==='watchReq'&&stream)callTo(m.from);
   else if(m.t==='unwatch'){const k=out.get(m.from);if(k)k.close();out.delete(m.from)}
 }
@@ -175,17 +184,17 @@ function startHost(attempt=0){
   try{localStorage.setItem('sala',code)}catch(e){}
   show(true);setStatus('Criando sala…');
   setupPeer(PRE+code,()=>{
-    peers.set(myId,{name:me,live:false});
+    peers.set(myId,{name:me,live:false,hue:pickHue()});
+    setInterval(sweep,5000);
     $('link').value=location.href.split('#')[0]+'#'+code;history.replaceState(null,'','#'+code);
     setStatus('Sala pronta','ok');renderPeople();
   });
   peer.on('connection',c=>{
-    conns.set(c.peer,c);
+    conns.set(c.peer,c);seen.set(c.peer,Date.now());
     c.on('data',d=>route(c.peer,d));
-    const gone=()=>{if(!conns.has(c.peer))return;conns.delete(c.peer);const p=peers.get(c.peer);peers.delete(c.peer);
-      const k=out.get(c.peer);if(k)k.close();out.delete(c.peer);
-      if(p)bc({t:'sys',m:p.name+' saiu'});pushRoster()};
+    const gone=()=>removePeer(c.peer);
     c.on('close',gone);c.on('error',gone);
+    c.on('open',()=>{const pc=c.peerConnection;if(pc)pc.addEventListener('iceconnectionstatechange',()=>{if(pc.iceConnectionState==='failed'||pc.iceConnectionState==='closed')gone()})});
   });
   peer.on('error',e=>{if(e.type==='unavailable-id'&&attempt<3){peer.destroy();startHost(attempt+1)}else setStatus('Erro: '+e.type+'. Recarregue a página.','bad')});
 }
@@ -194,7 +203,8 @@ function startViewer(code){
   getName();isHost=false;show(true);$('link').value=location.href.split('#')[0]+'#'+code;setStatus('Conectando…');
   setupPeer(null,()=>{
     hostConn=peer.connect(PRE+code,{reliable:true});
-    hostConn.on('open',()=>{hostConn.send({t:'hello',n:me});setStatus('Na sala','ok')});
+    hostConn.on('open',()=>{hostConn.send({t:'hello',n:me});setStatus('Na sala','ok');
+      setInterval(()=>{if(hostConn.open)hostConn.send({t:'ping'})},4000)});
     hostConn.on('data',onMsg);
     hostConn.on('close',()=>setStatus('O anfitrião saiu. Transmissões em andamento continuam, mas a lista e o chat pararam.','bad'));
   });
@@ -206,7 +216,9 @@ function renderPeople(){
   const ul=$('people');ul.innerHTML='';
   peers.forEach((p,id)=>{
     const li=h('li','v'),self=id===myId;
-    li.appendChild(h('span','n',p.name+(self?' (você)':'')+(id===PRE?'':'')));
+    const nm=h('span','n'+(p.hue!=null?' c':''),p.name+(self?' (você)':''));
+    if(p.hue!=null)nm.style.setProperty('--h',p.hue);
+    li.appendChild(nm);
     if(p.live)li.appendChild(h('span','live','AO VIVO'));
     if(p.live&&!self){
       const w=watching.has(id),b=h('button','sm'+(w?'':' pri'),w?'Sair':'Assistir');
@@ -315,9 +327,47 @@ function applySettings(){
 
 /* ---------- Início ---------- */
 try{const n=localStorage.getItem('nome');if(n)$('name').value=n}catch(e){}
-window.addEventListener('beforeunload',()=>{try{peer&&peer.destroy()}catch(e){}});
-if(!window.Peer)document.querySelector('#home p').textContent='Não foi possível carregar a biblioteca de conexão. Verifique sua internet e recarregue.';
-else if(location.hash.length>1)startViewer(clean(location.hash));
+/* ---------- Saída de pessoas (só o anfitrião mantém esta lista) ---------- */
+function removePeer(id){
+  if(!peers.has(id)&&!conns.has(id))return;
+  const c=conns.get(id),p=peers.get(id);
+  conns.delete(id);peers.delete(id);seen.delete(id);
+  const k=out.get(id);if(k)k.close();out.delete(id);
+  try{if(c)c.close()}catch(e){}
+  if(p)bc({t:'sys',m:p.name+' saiu'});
+  pushRoster();
+}
+function sweep(){const now=Date.now();[...conns.keys()].forEach(id=>{if(now-(seen.get(id)||0)>20000)removePeer(id)})}
+function bye(){try{if(isHost)bc({t:'hostbye'});else if(hostConn&&hostConn.open)hostConn.send({t:'bye'})}catch(e){}}
+function leave(){
+  bye();if(stream)stream.getTracks().forEach(t=>t.stop());
+  setTimeout(()=>{try{peer.destroy()}catch(e){}location.href=location.href.split('#')[0]},250);
+}
+window.addEventListener('pagehide',bye);window.addEventListener('beforeunload',bye);
+
+/* ---------- Cores do chat: espalha os tons e evita repetir ---------- */
+function pickHue(){
+  const used=[...peers.values()].map(p=>p.hue).filter(x=>x!=null);
+  const cand=Array.from({length:24},(_,i)=>i*15).sort(()=>Math.random()-.5);
+  const score=x=>{
+    const n=used.filter(u=>u===x).length;if(n)return -n;
+    return used.length?Math.min(...used.map(u=>{const d=Math.abs(u-x);return Math.min(d,360-d)})):180;
+  };
+  cand.sort((a,b)=>score(b)-score(a));
+  return cand[Math.floor(Math.random()*3)];
+}
+
+/* ---------- Entrada pelo link: pede o nome antes ---------- */
+let pendingCode=null;
+function prepareJoin(code){
+  pendingCode=code;
+  $('intro').textContent='Você foi convidado para uma sala. Digite seu nome para entrar.';
+  $('createRow').classList.add('hide');$('codeBlock').classList.add('hide');$('linkRow').classList.remove('hide');
+  $('name').focus();
+}
+function joinFromLink(){startViewer(pendingCode)}
+if(!window.Peer)$('intro').textContent='Não foi possível carregar a biblioteca de conexão. Verifique sua internet e recarregue.';
+else if(location.hash.length>1)prepareJoin(clean(location.hash));
 </script>
 </body>
 </html>
