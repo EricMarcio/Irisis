@@ -357,7 +357,6 @@ async function share(){
   try{stream=await navigator.mediaDevices.getDisplayMedia(opts)}
   catch(e){setStatus('Captura cancelada ou bloqueada','bad');return}
   const vt=stream.getVideoTracks()[0];vt.onended=stopShare;
-  if(am==='app'&&((vt.getSettings()||{}).displaySurface==='monitor'))stream.getAudioTracks().forEach(t=>{t.stop();stream.removeTrack(t)});
   const t=addTile('me','Sua transmissão',true);t._v.srcObject=stream;t._ph.classList.add('hide');
   $('bShare').disabled=true;$('bStop').disabled=false;
   send({t:'live',on:true});applySettings();
