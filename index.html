@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sala de tela</title>
+<title>Irisis</title>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
-:root{color-scheme:dark;--bg:#10151f;--card:#18202e;--line:#2a3547;--tx:#e8edf5;--mut:#8b98ad;--ac:#ffb454;--ok:#5fd3a0;--bad:#ff7a7a}
-:root[data-theme="light"]{color-scheme:light;--bg:#eef1f6;--card:#fff;--line:#d3dae6;--tx:#161d2b;--mut:#5b687d;--ac:#c26a00;--ok:#13805a;--bad:#c23030}
-:root[data-theme="mid"]{color-scheme:dark;--bg:#566178;--card:#647089;--line:#8592ab;--tx:#f4f7fb;--mut:#e0e6f0;--ac:#ffd08a;--ok:#9af2cc;--bad:#ffb4b4}
+:root{color-scheme:dark;--bg:#151618;--card:#1c1d20;--line:#2a2c30;--tx:#ececea;--mut:#9a9ca3;--ac:#8ea2ff;--ok:#5fd3a0;--bad:#ff7b72}
+:root[data-theme="light"]{color-scheme:light;--bg:#fbfbfa;--card:#fff;--line:#e7e6e2;--tx:#1b1b1a;--mut:#6b6a66;--ac:#3451d1;--ok:#1c7a55;--bad:#c4382f}
+:root[data-theme="mid"]{color-scheme:dark;--bg:#3b3e45;--card:#44474f;--line:#5b5f69;--tx:#f2f2f0;--mut:#bfc2ca;--ac:#a9baff;--ok:#8ff0c4;--bad:#ffb4ac}
 .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
 .top h1{margin:0}
 .vol{width:68px;accent-color:var(--ac);cursor:pointer}
@@ -53,19 +53,70 @@ li.v .n{flex:1;overflow-wrap:anywhere}
 #log{height:180px;overflow-y:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;font-size:.9rem}
 #log div{margin-bottom:4px;overflow-wrap:anywhere}#log b{color:hsl(var(--h,40) 78% var(--cl))}#log i{color:var(--mut)}
 .link{display:flex;gap:8px}.link input{font:13px monospace}
+/* minimalista */
+body{font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:1240px;padding:24px 24px 64px}
+h1{font-family:inherit;font-size:1.1rem;font-weight:600;letter-spacing:-.02em}
+h2{font-size:.85rem;font-weight:600;color:var(--mut);margin-bottom:10px}
+.top{padding-bottom:16px;margin-bottom:22px;border-bottom:1px solid var(--line)}
+.card{background:transparent;border-radius:8px;padding:14px 16px}
+button,select{background:transparent;border-radius:6px;padding:7px 12px;font-weight:500;transition:background .15s,border-color .15s}
+select{background:var(--bg)}
+button:hover{background:color-mix(in srgb,var(--tx) 7%,transparent);border-color:var(--line)}
+button.pri{background:var(--tx);color:var(--bg);border-color:var(--tx)}
+button.pri:hover{background:var(--tx);opacity:.88}
+input[type=text]{background:transparent;border-radius:6px;padding:8px 10px}
+input[type=text]:focus{border-color:var(--ac)}
+#home{max-width:420px;margin:10vh auto 0}
+#home #intro{font-size:1.25rem;line-height:1.4;color:var(--tx);letter-spacing:-.01em;margin-bottom:24px}
+#home .card{background:none;border:0;padding:0}
+.tile{border-radius:8px;border:1px solid var(--line)}
+.bar button{background:rgba(0,0,0,.5);color:#fff;border-color:transparent}
+.hint{border-radius:8px;padding:56px 20px}
+li.v{border-bottom:0;padding:5px 0}
+li.v .n.c{color:inherit;font-weight:500}
+.av{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;flex:none;background:hsl(var(--h,40) 60% 50%/.2);color:hsl(var(--h,40) 78% var(--cl))}
+.live{background:none;color:var(--bad);padding:0;font-size:.78rem;font-weight:500}
+.live::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--bad);margin-right:5px}
+#log{background:transparent;border:0;padding:0;height:240px}
+details.adj summary{cursor:pointer;color:var(--mut);font-size:.88rem;margin-top:14px;list-style:none}
+details.adj summary::before{content:"+ "}details.adj[open] summary::before{content:"− "}
+.grid.theater{grid-template-columns:1fr}.grid.theater aside{display:none}
+/* linhas mais visíveis */
+:root{--line:#4b4e56}:root[data-theme="light"]{--line:#b1afa8}:root[data-theme="mid"]{--line:#878c99}
+li.v{border-bottom:1px solid var(--line)}li.v:last-child{border-bottom:0}
+/* tamanho do texto ajustável */
+html{font-size:calc(16px*var(--fs,1))}
+body{font-size:.9375rem}
+.link input{font-size:.8rem}
+.grid{grid-template-columns:minmax(0,1fr) minmax(19rem,32%)}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+:root[data-fsbig] .grid{grid-template-columns:1fr}
+/* contraste reforçado */
+:root[data-hc][data-theme="light"]{--line:#5f5e59;--mut:#3d3c39}
+:root[data-hc][data-theme="dark"]{--line:#8f929b;--mut:#cfd1d6}
+:root[data-hc][data-theme="mid"]{--line:#c3c7cf;--mut:#eef0f3}
+:root[data-hc] .card,:root[data-hc] button,:root[data-hc] select,:root[data-hc] input[type=text]{border-width:2px}
+/* diálogo de ajustes */
+dialog{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:10px;width:min(92vw,28rem);padding:20px}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.fsrow{display:flex;gap:10px;align-items:center;margin:8px 0 14px}.fsrow input{flex:1;accent-color:var(--ac)}
+#intro:empty{display:none}
 </style>
 <script>
 (function(){var t=null;try{t=localStorage.getItem('tema')}catch(e){}
 if(t!=='light'&&t!=='mid'&&t!=='dark')t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';
 document.documentElement.setAttribute('data-theme',t)})();
+function applyPrefs(fs,hc){var r=document.documentElement;r.style.setProperty('--fs',fs);if(fs>=1.5)r.setAttribute('data-fsbig','');else r.removeAttribute('data-fsbig');if(hc)r.setAttribute('data-hc','');else r.removeAttribute('data-hc')}
+(function(){var fs=1,hc=false;try{fs=parseFloat(localStorage.getItem('fonte'))||1;hc=localStorage.getItem('contraste')==='1'}catch(e){}applyPrefs(fs,hc)})();
 </script>
 </head>
 <body>
 <main>
-<header class="top"><h1>Sala de tela</h1><div class="row"><button id="bLeave" class="hide" onclick="leave()">Sair da sala</button><button id="bTheme" onclick="cycleTheme()" title="Alternar tema"></button></div></header>
+<header class="top"><h1>Irisis</h1><div class="row"><button id="bLeave" class="hide" onclick="leave()">Sair da sala</button><button onclick="openSettings()">Ajustes</button><button id="bTheme" onclick="cycleTheme()" title="Alternar tema"></button></div></header>
 
 <section id="home">
-  <p id="intro">Todos na sala podem transmitir a tela ou uma janela, e cada um escolhe quais transmissões assistir. Sem conta e sem servidor seu.</p>
+  <p id="intro"></p>
   <div class="card" style="max-width:460px">
     <h2>Seu nome</h2>
     <input type="text" id="name" maxlength="20" placeholder="Como os amigos vão te ver" onkeydown="if(event.key==='Enter'&&pendingCode)joinFromLink()">
@@ -91,16 +142,17 @@ document.documentElement.setAttribute('data-theme',t)})();
         <div class="row">
           <button class="pri" id="bShare" onclick="share()">Compartilhar minha tela</button>
           <button id="bStop" onclick="stopShare()" disabled>Parar</button>
+          <button onclick="document.querySelector('.grid').classList.toggle('theater')">Modo teatro</button>
           <label class="ck"><input type="checkbox" id="audio" checked> Incluir áudio</label>
           <span style="flex:1"></span><span class="st" id="status"></span>
         </div>
-        <div class="q">
+        <details class="adj"><summary>Qualidade da transmissão</summary><div class="q">
           <label>Resolução<select id="qRes" onchange="applySettings()"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="0">Original da tela</option></select></label>
           <label>Quadros por segundo<select id="qFps" onchange="applySettings()"><option>5</option><option>15</option><option selected>30</option><option>60</option></select></label>
           <label>Taxa de bits<select id="qBit" onchange="applySettings()"><option value="0">Automática</option><option value="1">1 Mbps</option><option value="2.5">2,5 Mbps</option><option value="5" selected>5 Mbps</option><option value="8">8 Mbps</option><option value="15">15 Mbps</option></select></label>
           <label>Prioridade<select id="qHint" onchange="applySettings()"><option value="detail" selected>Nitidez (texto, código)</option><option value="motion">Fluidez (jogos, vídeo)</option></select></label>
         </div>
-        <p class="st" id="qInfo" style="margin:8px 0 0">As mudanças valem na hora, mesmo durante a transmissão. Taxas altas exigem mais da sua internet de envio, e ela é dividida entre quem está assistindo.</p>
+        <p class="st" id="qInfo" style="margin:8px 0 0">As mudanças valem na hora, mesmo durante a transmissão. Taxas altas exigem mais da sua internet de envio, e ela é dividida entre quem está assistindo.</p></details>
       </div>
     </div>
     <aside>
@@ -112,6 +164,18 @@ document.documentElement.setAttribute('data-theme',t)})();
   </div>
 </section>
 </main>
+<dialog id="dlg" aria-labelledby="dlgT">
+  <h2 id="dlgT" style="font-size:1.05rem;color:var(--tx)">Ajustes de leitura</h2>
+  <p>Tamanho do texto: <b id="fsv">100%</b></p>
+  <div class="fsrow">
+    <button onclick="stepFs(-10)" aria-label="Diminuir texto">A−</button>
+    <input type="range" id="fsr" min="100" max="200" step="10" value="100" aria-label="Tamanho do texto" oninput="setPrefs(this.value/100,$('hc').checked)">
+    <button onclick="stepFs(10)" aria-label="Aumentar texto">A+</button>
+  </div>
+  <p>Exemplo: é assim que as mensagens do chat vão aparecer para você.</p>
+  <label class="ck" style="margin:10px 0 16px"><input type="checkbox" id="hc" onchange="setPrefs($('fsr').value/100,this.checked)"> Contraste reforçado (linhas e textos mais fortes)</label>
+  <div class="row"><button onclick="setPrefs(1,false)">Restaurar padrão</button><span style="flex:1"></span><button class="pri" onclick="$('dlg').close()">Fechar</button></div>
+</dialog>
 
 <script>
 const $=id=>document.getElementById(id);
@@ -127,6 +191,13 @@ function cycleTheme(){
   document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('tema',nx)}catch(e){}setThemeLabel();
 }
 setThemeLabel();
+function loadPrefs(){let fs=1,hc=false;try{fs=parseFloat(localStorage.getItem('fonte'))||1;hc=localStorage.getItem('contraste')==='1'}catch(e){}return{fs,hc}}
+function setPrefs(fs,hc){
+  applyPrefs(fs,hc);try{localStorage.setItem('fonte',fs);localStorage.setItem('contraste',hc?'1':'0')}catch(e){}
+  $('fsr').value=Math.round(fs*100);$('fsv').textContent=Math.round(fs*100)+'%';$('hc').checked=hc;
+}
+function openSettings(){const p=loadPrefs();setPrefs(p.fs,p.hc);$('dlg').showModal()}
+function stepFs(d){const v=Math.min(200,Math.max(100,Math.round(+$('fsr').value)+d));setPrefs(v/100,$('hc').checked)}
 const rnd=()=>Math.random().toString(36).slice(2,8);
 const clean=s=>(s||'').trim().replace(/^.*#/,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
 function setStatus(t,c){const s=$('status');s.textContent=t;s.className='st '+(c||'')}
@@ -218,8 +289,10 @@ function renderPeople(){
     const li=h('li','v'),self=id===myId;
     const nm=h('span','n'+(p.hue!=null?' c':''),p.name+(self?' (você)':''));
     if(p.hue!=null)nm.style.setProperty('--h',p.hue);
-    li.appendChild(nm);
-    if(p.live)li.appendChild(h('span','live','AO VIVO'));
+    const av=h('span','av',(p.name||'?').trim().charAt(0).toUpperCase());
+    if(p.hue!=null)av.style.setProperty('--h',p.hue);
+    li.append(av,nm);
+    if(p.live)li.appendChild(h('span','live','ao vivo'));
     if(p.live&&!self){
       const w=watching.has(id),b=h('button','sm'+(w?'':' pri'),w?'Sair':'Assistir');
       b.onclick=()=>w?stopWatching(id,true):watch(id);li.appendChild(b);
