@@ -102,11 +102,23 @@ dialog{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-
 dialog::backdrop{background:rgba(0,0,0,.55)}
 .fsrow{display:flex;gap:10px;align-items:center;margin:8px 0 14px}.fsrow input{flex:1;accent-color:var(--ac)}
 #intro:empty{display:none}
-#pick{width:min(94vw,56rem)}
-.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;max-height:60vh;overflow:auto;margin-top:10px}
-.src{display:flex;flex-direction:column;gap:6px;text-align:left;padding:8px}
-.src img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;background:#000}
-.src span{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#link{font-size:1.15rem;letter-spacing:.08em;font-weight:600}
+#pick{width:min(94vw,60rem);max-height:88vh;padding:0;overflow:hidden}
+#pick[open]{display:flex;flex-direction:column}
+.ph2{padding:18px 20px 6px}.ph2 h2{font-size:1.05rem;color:var(--tx);margin:0 0 2px}.ph2 p{margin:0}
+.ptabs{display:flex;gap:6px;padding:8px 20px 0;border-bottom:1px solid var(--line)}
+.ptabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;color:var(--mut)}
+.ptabs button.on{color:var(--tx);border-bottom-color:var(--ac)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;padding:16px 20px;overflow-y:auto;min-height:12rem;flex:1}
+.pgrid .nada{grid-column:1/-1;color:var(--mut);text-align:center;padding:30px 0}
+.src{display:flex;flex-direction:column;align-items:stretch;gap:8px;text-align:left;padding:8px;min-width:0;overflow:hidden;border-radius:8px}
+.src.sel{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+.src img.th{width:100%;aspect-ratio:16/9;object-fit:contain;border-radius:4px;background:#000;display:block}
+.src .cap{display:flex;gap:6px;align-items:flex-start;min-width:0}
+.src .cap img{width:16px;height:16px;flex:none;margin-top:2px}
+.src .cap span{font-size:.82rem;font-weight:500;line-height:1.3;min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.pfoot{display:flex;gap:8px;align-items:center;padding:12px 20px;border-top:1px solid var(--line)}
+.pfoot .st{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
 <script>
 (function(){var t=null;try{t=localStorage.getItem('tema')}catch(e){}
@@ -128,16 +140,16 @@ function applyPrefs(fs,hc){var r=document.documentElement;r.style.setProperty('-
     <div class="row hide" id="linkRow" style="margin-top:12px"><button class="pri" onclick="joinFromLink()">Entrar na sala</button></div>
     <div class="row" id="createRow" style="margin-top:12px"><button class="pri" onclick="startHost()">Criar sala</button></div>
     <div id="codeBlock">
-      <p style="margin-top:14px">Recebeu um link ou código?</p>
-      <div class="row"><input type="text" id="code" placeholder="Link ou código da sala" style="flex:1;width:auto"><button onclick="goJoin()">Entrar</button></div>
+      <p style="margin-top:14px">Recebeu um código?</p>
+      <div class="row"><input type="text" id="code" placeholder="Código da sala" style="flex:1;width:auto"><button onclick="goJoin()">Entrar</button></div>
     </div>
   </div>
 </section>
 
 <section id="room" class="hide">
   <div class="card">
-    <h2>Link da sala</h2>
-    <div class="link"><input type="text" id="link" readonly><button onclick="copyLink(this)">Copiar</button></div>
+    <h2>Código da sala</h2>
+    <div class="link"><input type="text" id="link" readonly aria-label="Código da sala"><button onclick="copyLink(this)">Copiar código</button></div>
   </div>
   <div class="grid">
     <div>
@@ -170,9 +182,10 @@ function applyPrefs(fs,hc){var r=document.documentElement;r.style.setProperty('-
 </section>
 </main>
 <dialog id="pick" aria-labelledby="pickT">
-  <h2 id="pickT" style="font-size:1.05rem;color:var(--tx)">O que você quer transmitir?</h2>
+  <div class="ph2"><h2 id="pickT">O que você quer transmitir?</h2><p class="st" id="pickAudio"></p></div>
+  <div class="ptabs"><button id="tabScreen" onclick="pickTab('screen')">Telas</button><button id="tabWin" onclick="pickTab('window')">Janelas</button></div>
   <div id="pickGrid" class="pgrid"></div>
-  <div class="row" style="margin-top:14px"><span style="flex:1"></span><button onclick="$('pick').close()">Cancelar</button></div>
+  <div class="pfoot"><span class="st" id="pickSel"></span><span style="flex:1"></span><button onclick="$('pick').close()">Cancelar</button><button class="pri" id="pickOk" disabled>Compartilhar</button></div>
 </dialog>
 <dialog id="dlg" aria-labelledby="dlgT">
   <h2 id="dlgT" style="font-size:1.05rem;color:var(--tx)">Ajustes de leitura</h2>
@@ -268,7 +281,7 @@ function startHost(attempt=0){
   setupPeer(PRE+code,()=>{
     peers.set(myId,{name:me,live:false,hue:pickHue()});
     setInterval(sweep,5000);
-    $('link').value=BASE()+'#'+code;history.replaceState(null,'','#'+code);
+    $('link').value=code;history.replaceState(null,'','#'+code);
     setStatus('Sala pronta','ok');renderPeople();
   });
   peer.on('connection',c=>{
@@ -280,9 +293,9 @@ function startHost(attempt=0){
   });
   peer.on('error',e=>{if(e.type==='unavailable-id'&&attempt<3){peer.destroy();startHost(attempt+1)}else setStatus('Erro: '+e.type+'. Recarregue a página.','bad')});
 }
-function goJoin(){const c=clean($('code').value);if(!c){alert('Cole o link ou código da sala.');return}location.hash=c;startViewer(c)}
+function goJoin(){const c=clean($('code').value);if(!c){alert('Digite o código da sala.');return}location.hash=c;startViewer(c)}
 function startViewer(code){
-  getName();isHost=false;show(true);$('link').value=BASE()+'#'+code;setStatus('Conectando…');
+  getName();isHost=false;show(true);$('link').value=code;setStatus('Conectando…');
   setupPeer(null,()=>{
     hostConn=peer.connect(PRE+code,{reliable:true});
     hostConn.on('open',()=>{hostConn.send({t:'hello',n:me});setStatus('Na sala','ok');
@@ -456,14 +469,32 @@ function pickHue(){
 
 /* ---------- Entrada pelo link: pede o nome antes ---------- */
 /* ---------- Somente no aplicativo de PC ---------- */
+let pickList=[],pickSel=null,pickT='screen';
+function pickTab(t){pickT=t;pickSel=null;renderPick()}
+function renderPick(){
+  const g=$('pickGrid'),top=g.scrollTop;g.innerHTML='';
+  $('tabScreen').classList.toggle('on',pickT==='screen');$('tabWin').classList.toggle('on',pickT==='window');
+  const items=pickList.filter(s=>s.screen===(pickT==='screen'));
+  if(!items.length)g.appendChild(h('div','nada','Nada encontrado aqui.'));
+  items.forEach(s=>{
+    const b=h('button','src'+(pickSel&&pickSel.id===s.id?' sel':'')),img=h('img','th'),cap=h('div','cap');
+    img.src=s.thumb;img.alt='';
+    if(s.icon){const ic=h('img');ic.src=s.icon;ic.alt='';cap.appendChild(ic)}
+    cap.appendChild(h('span',null,s.name));b.title=s.name;b.append(img,cap);
+    b.onclick=()=>{pickSel=s;renderPick()};b.ondblclick=()=>$('pickOk').click();
+    g.appendChild(b);
+  });
+  g.scrollTop=top;
+  $('pickOk').disabled=!pickSel;$('pickSel').textContent=pickSel?pickSel.name:'Selecione uma tela ou janela';
+}
 async function pickSource(){
-  const list=await window.irisis.listSources(),g=$('pickGrid');g.innerHTML='';
+  pickList=await window.irisis.listSources();pickSel=null;
+  const a=$('audio');$('pickAudio').textContent='Áudio: '+a.options[a.selectedIndex].text;
   return new Promise(res=>{
-    list.forEach(s=>{
-      const b=h('button','src'),img=h('img');img.src=s.thumb;img.alt='';
-      b.append(img,h('span',null,s.name));b.onclick=()=>{$('pick').close();res({id:s.id,name:s.name})};g.appendChild(b);
-    });
-    $('pick').onclose=()=>res(null);$('pick').showModal();
+    $('pickOk').onclick=()=>{const s=pickSel;if(!s)return;$('pick').close();res({id:s.id,name:s.name})};
+    $('pick').onclose=()=>res(null);
+    pickTab(a.value==='win'&&pickList.some(s=>!s.screen)?'window':'screen');
+    $('pick').showModal();
   });
 }
 let aud=null;
