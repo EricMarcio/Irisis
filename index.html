@@ -102,6 +102,11 @@ dialog{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-
 dialog::backdrop{background:rgba(0,0,0,.55)}
 .fsrow{display:flex;gap:10px;align-items:center;margin:8px 0 14px}.fsrow input{flex:1;accent-color:var(--ac)}
 #intro:empty{display:none}
+#pick{width:min(94vw,56rem)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;max-height:60vh;overflow:auto;margin-top:10px}
+.src{display:flex;flex-direction:column;gap:6px;text-align:left;padding:8px}
+.src img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;background:#000}
+.src span{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
 <script>
 (function(){var t=null;try{t=localStorage.getItem('tema')}catch(e){}
@@ -164,6 +169,11 @@ function applyPrefs(fs,hc){var r=document.documentElement;r.style.setProperty('-
   </div>
 </section>
 </main>
+<dialog id="pick" aria-labelledby="pickT">
+  <h2 id="pickT" style="font-size:1.05rem;color:var(--tx)">O que você quer transmitir?</h2>
+  <div id="pickGrid" class="pgrid"></div>
+  <div class="row" style="margin-top:14px"><span style="flex:1"></span><button onclick="$('pick').close()">Cancelar</button></div>
+</dialog>
 <dialog id="dlg" aria-labelledby="dlgT">
   <h2 id="dlgT" style="font-size:1.05rem;color:var(--tx)">Ajustes de leitura</h2>
   <p>Tamanho do texto: <b id="fsv">100%</b></p>
@@ -184,6 +194,7 @@ const PRE='sala-';
 let peer,myId='',me='',isHost=false,hostConn=null,stream=null;
 const peers=new Map(),conns=new Map(),out=new Map(),watching=new Set(),inCalls=new Map(),tiles=new Map();
 const vols=new Map(),seen=new Map();
+const BASE=()=>(window.irisis&&window.irisis.siteUrl)||location.href.split('#')[0];
 const THEMES=['light','mid','dark'],TNAME={light:'Claro',mid:'Meio-termo',dark:'Escuro'};
 function setThemeLabel(){$('bTheme').textContent='Tema: '+TNAME[document.documentElement.getAttribute('data-theme')]}
 function cycleTheme(){
@@ -257,7 +268,7 @@ function startHost(attempt=0){
   setupPeer(PRE+code,()=>{
     peers.set(myId,{name:me,live:false,hue:pickHue()});
     setInterval(sweep,5000);
-    $('link').value=location.href.split('#')[0]+'#'+code;history.replaceState(null,'','#'+code);
+    $('link').value=BASE()+'#'+code;history.replaceState(null,'','#'+code);
     setStatus('Sala pronta','ok');renderPeople();
   });
   peer.on('connection',c=>{
@@ -271,7 +282,7 @@ function startHost(attempt=0){
 }
 function goJoin(){const c=clean($('code').value);if(!c){alert('Cole o link ou código da sala.');return}location.hash=c;startViewer(c)}
 function startViewer(code){
-  getName();isHost=false;show(true);$('link').value=location.href.split('#')[0]+'#'+code;setStatus('Conectando…');
+  getName();isHost=false;show(true);$('link').value=BASE()+'#'+code;setStatus('Conectando…');
   setupPeer(null,()=>{
     hostConn=peer.connect(PRE+code,{reliable:true});
     hostConn.on('open',()=>{hostConn.send({t:'hello',n:me});setStatus('Na sala','ok');
@@ -354,17 +365,26 @@ async function share(){
   const am=$('audio').value,opts={video:videoConstraints(),audio:am!=='none'};
   if(am==='app'){opts.systemAudio='exclude';opts.windowAudio='window'}
   else if(am==='sys'){opts.systemAudio='include';opts.windowAudio='system'}
+  let plan=null;
+  if(window.irisis){const pk=await pickSource();if(!pk)return;plan=await window.irisis.setSource(pk.id,am,pk.name)}
   try{stream=await navigator.mediaDevices.getDisplayMedia(opts)}
   catch(e){setStatus('Captura cancelada ou bloqueada','bad');return}
   const vt=stream.getVideoTracks()[0];vt.onended=stopShare;
+  if(am==='app'){
+    const ds=(vt.getSettings()||{}).displaySurface;
+    stream.getAudioTracks().forEach(t=>{if(ds==='monitor'||/system|sistema/i.test(t.label||'')){t.stop();stream.removeTrack(t)}});
+  }
+  if(plan&&plan.cap){
+    try{stream.addTrack(await startAppAudio())}catch(e){plan.note='Sem áudio: '+(e.message||'falha na captura')+'.'}
+  }
   const t=addTile('me','Sua transmissão',true);t._v.srcObject=stream;t._ph.classList.add('hide');
   $('bShare').disabled=true;$('bStop').disabled=false;
   send({t:'live',on:true});applySettings();
-  setStatus(am!=='none'&&!stream.getAudioTracks().length?'Você está ao vivo, mas sem áudio. Para ter som sem captar o Discord, compartilhe uma aba do navegador.':'Você está ao vivo','ok');
+  setStatus(plan?'Você está ao vivo. '+plan.note:(am!=='none'&&!stream.getAudioTracks().length?'Você está ao vivo, mas sem áudio. Para ter som sem captar o Discord, compartilhe uma aba do navegador.':'Você está ao vivo'),'ok');
 }
 function stopShare(){
   if(!stream)return;
-  stream.getTracks().forEach(t=>t.stop());stream=null;
+  stream.getTracks().forEach(t=>t.stop());stream=null;stopAppAudio();
   out.forEach(k=>k.close());out.clear();removeTile('me');
   $('bShare').disabled=false;$('bStop').disabled=true;
   send({t:'live',on:false});setStatus('Sala pronta','ok');
@@ -435,6 +455,46 @@ function pickHue(){
 }
 
 /* ---------- Entrada pelo link: pede o nome antes ---------- */
+/* ---------- Somente no aplicativo de PC ---------- */
+async function pickSource(){
+  const list=await window.irisis.listSources(),g=$('pickGrid');g.innerHTML='';
+  return new Promise(res=>{
+    list.forEach(s=>{
+      const b=h('button','src'),img=h('img');img.src=s.thumb;img.alt='';
+      b.append(img,h('span',null,s.name));b.onclick=()=>{$('pick').close();res({id:s.id,name:s.name})};g.appendChild(b);
+    });
+    $('pick').onclose=()=>res(null);$('pick').showModal();
+  });
+}
+let aud=null;
+const WK=`class P extends AudioWorkletProcessor{
+constructor(){super();this.q=[];this.n=0;this.o=0;
+this.port.onmessage=e=>{this.q.push(e.data);this.n+=e.data[0].length;
+while(this.n>14400&&this.q.length>1){const d=this.q.shift();this.n-=d[0].length-this.o;this.o=0}}}
+process(i,out){const o=out[0],L=o[0],R=o[1]||o[0];let k=0;
+while(k<L.length&&this.q.length){const b=this.q[0],m=Math.min(L.length-k,b[0].length-this.o);
+L.set(b[0].subarray(this.o,this.o+m),k);R.set(b[1].subarray(this.o,this.o+m),k);
+k+=m;this.o+=m;this.n-=m;if(this.o>=b[0].length){this.q.shift();this.o=0}}return true}}
+registerProcessor('p',P)`;
+async function startAppAudio(){
+  const ctx=new AudioContext({sampleRate:48000});
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WK],{type:'application/javascript'})));
+  const node=new AudioWorkletNode(ctx,'p',{numberOfInputs:0,outputChannelCount:[2]});
+  const dest=ctx.createMediaStreamDestination();node.connect(dest);await ctx.resume();
+  window.irisis.onAudio(buf=>{
+    const i=new Int16Array(buf.byteLength>>1);new Uint8Array(i.buffer).set(buf);
+    const f=i.length>>1,L=new Float32Array(f),R=new Float32Array(f);
+    for(let k=0;k<f;k++){L[k]=i[2*k]/32768;R[k]=i[2*k+1]/32768}
+    node.port.postMessage([L,R],[L.buffer,R.buffer]);
+  });
+  if(!(await window.irisis.startAudio()))throw new Error('o Windows não iniciou a captura');
+  aud=ctx;return dest.stream.getAudioTracks()[0];
+}
+function stopAppAudio(){if(!aud)return;try{window.irisis.stopAudio()}catch(e){}aud.close().catch(()=>{});aud=null}
+if(window.irisis){
+  $('audio').innerHTML='<option value="win" selected>Só da janela escolhida</option><option value="nodiscord">Tudo, menos o Discord</option><option value="sys">Computador inteiro (inclui o Discord)</option><option value="none">Sem áudio</option>';
+  $('audio').title='Só da janela escolhida: envia apenas o som do programa dessa janela';
+}
 let pendingCode=null;
 function prepareJoin(code){
   pendingCode=code;
