@@ -11,7 +11,11 @@
 :root[data-theme="mid"]{color-scheme:dark;--bg:#3b3e45;--card:#44474f;--line:#5b5f69;--tx:#f2f2f0;--mut:#bfc2ca;--ac:#a9baff;--ok:#8ff0c4;--bad:#ffb4ac}
 .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
 .top h1{margin:0}
-.vol{width:68px;accent-color:var(--ac);cursor:pointer}
+.vol{width:90px;accent-color:var(--ac);cursor:pointer}
+.bar{transition:opacity .25s}
+.bar .pct{color:#fff;font-size:.8rem;min-width:3.4em;text-align:right;text-shadow:0 1px 2px #000}
+.tile.idle,.tile.idle *{cursor:none}
+.tile.idle .bar{opacity:0;pointer-events:none}
 :root{--cl:70%}:root[data-theme="light"]{--cl:34%}:root[data-theme="mid"]{--cl:88%}
 li.v .n.c{color:hsl(var(--h) 78% var(--cl));font-weight:700}
 *{box-sizing:border-box}
@@ -328,33 +332,59 @@ function renderPeople(){
 function updateHint(){$('hint').classList.toggle('hide',tiles.size>0)}
 
 /* ---------- Telas na grade ---------- */
+let actx=null;
+function getCtx(){if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();return actx}
+document.addEventListener('pointerdown',()=>{if(actx&&actx.state==='suspended')actx.resume()},true);
+function toggleFs(t){if(document.fullscreenElement===t)document.exitFullscreen();else if(t.requestFullscreen)t.requestFullscreen()}
+document.addEventListener('fullscreenchange',()=>tiles.forEach(t=>{if(t._fs)t._fs.textContent=document.fullscreenElement===t?'Sair da tela cheia':'Tela cheia'}));
+
 function addTile(id,label,local){
   if(tiles.has(id))return tiles.get(id);
   const t=h('div','tile'),v=h('video'),ph=h('div','ph',local?'':'Conectando…'),bar=h('div','bar');
-  v.autoplay=true;v.playsInline=true;if(local)v.muted=true;
+  v.autoplay=true;v.playsInline=true;v.muted=true;   /* o som sai pelo Web Audio, que permite até 200% */
+  t._muted=false;
   bar.appendChild(h('span','nm',label));
+  const mk=(txt,fn)=>{const b=h('button','sm',txt);b.onclick=()=>fn(b);bar.appendChild(b);return b};
   if(!local){
-    const r=h('input','vol');r.type='range';r.min=0;r.max=100;r.step=1;
-    const vol=vols.has(id)?vols.get(id):1;r.value=Math.round(vol*100);v.volume=vol;
+    const c=getCtx();if(c.resume)c.resume();
+    t._gain=c.createGain();t._gain.connect(c.destination);
+    const r=h('input','vol'),pct=h('span','pct'),mb=h('button','sm','Silenciar');
+    r.type='range';r.min=0;r.max=200;r.step=5;
+    const vol=vols.has(id)?vols.get(id):1;r.value=Math.round(vol*100);
     r.title='Volume de '+label;r.setAttribute('aria-label','Volume de '+label);
-    r.oninput=()=>{v.volume=r.value/100;vols.set(id,v.volume)};
-    bar.appendChild(r);
+    const apply=()=>{t._gain.gain.value=t._muted?0:r.value/100;pct.textContent=r.value+'%';mb.textContent=t._muted?'Ativar som':'Silenciar'};
+    r.oninput=()=>{vols.set(id,r.value/100);t._muted=false;apply()};
+    mb.onclick=()=>{t._muted=!t._muted;apply()};
+    apply();bar.append(r,pct,mb);
   }
-  const mk=(txt,fn)=>{const b=h('button','sm',txt);b.onclick=()=>fn(b);bar.appendChild(b)};
-  mk(v.muted?'Ativar som':'Silenciar',b=>{v.muted=!v.muted;b.textContent=v.muted?'Ativar som':'Silenciar'});
   mk('Destacar',b=>{t.classList.toggle('focus');b.textContent=t.classList.contains('focus')?'Reduzir':'Destacar'});
-  mk('Tela cheia',()=>{t.requestFullscreen&&t.requestFullscreen()});
+  t._fs=mk('Tela cheia',()=>toggleFs(t));
   if(!local)mk('Sair',()=>stopWatching(id,true));
+  v.ondblclick=()=>toggleFs(t);
   t.append(v,ph,bar);t._v=v;t._ph=ph;$('tiles').appendChild(t);tiles.set(id,t);
-  if(!local)t._to=setTimeout(()=>{if(!v.srcObject)ph.textContent='Sem sinal. Clique em Sair e tente assistir de novo.'},15000);
+  if(!local){
+    /* some o mouse e os controles após 3 s sem interação */
+    t._wake=()=>{t.classList.remove('idle');clearTimeout(t._idle);if(v.srcObject)t._idle=setTimeout(()=>t.classList.add('idle'),3000)};
+    ['mousemove','mousedown','keydown','touchstart','focusin'].forEach(e=>t.addEventListener(e,t._wake));
+    t._to=setTimeout(()=>{if(!v.srcObject)ph.textContent='Sem sinal. Clique em Sair e tente assistir de novo.'},15000);
+  }
   updateHint();return t;
 }
 function setTileStream(id,s){
   const t=tiles.get(id);if(!t)return;
-  t._v.srcObject=s;t._ph.classList.add('hide');
-  t._v.play().catch(()=>{t._v.muted=true;t._v.play()});
+  if(t._v.srcObject!==s)t._v.srcObject=s;
+  t._ph.classList.add('hide');t._v.play().catch(()=>{});
+  if(t._gain&&s.getAudioTracks().length){
+    try{if(t._src)t._src.disconnect();t._src=actx.createMediaStreamSource(s);t._src.connect(t._gain);if(actx.state==='suspended')actx.resume()}catch(e){}
+  }
+  if(t._wake)t._wake();
 }
-function removeTile(id){const t=tiles.get(id);if(!t)return;clearTimeout(t._to);t._v.srcObject=null;t.remove();tiles.delete(id);updateHint()}
+function removeTile(id){
+  const t=tiles.get(id);if(!t)return;
+  clearTimeout(t._to);clearTimeout(t._idle);
+  try{if(t._src)t._src.disconnect();if(t._gain)t._gain.disconnect()}catch(e){}
+  t._v.srcObject=null;t.remove();tiles.delete(id);updateHint();
+}
 
 /* ---------- Assistir ---------- */
 function watch(id){
